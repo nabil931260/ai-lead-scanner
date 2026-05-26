@@ -50,6 +50,11 @@ It is not meant to prove demand by itself. A scored lead is just a lead. Real va
 |   `-- generate_starter_sites.py
 |-- examples/
 |   |-- Leads Input.example.md
+|   |-- output/
+|   |   |-- Scored Leads.md
+|   |   |-- Mini Audits.md
+|   |   |-- Draft Messages.md
+|   |   `-- Outreach Queue.md
 |   `-- Outreach Queue.example.md
 |-- Automation Workflow.md
 |-- Lead Search Field Guide.md
@@ -59,6 +64,22 @@ It is not meant to prove demand by itself. A scored lead is just a lead. Real va
 |-- requirements.txt
 `-- README.md
 ```
+
+## Try The Demo
+
+The fastest way to see the project work is to run the fake-data demo. It uses only example `.test` domains and does not fetch websites, create Gmail drafts, or touch private working files.
+
+```powershell
+py -B .\scripts\run_demo.py
+```
+
+Generated demo files appear in:
+
+```text
+examples/output/
+```
+
+This is the best path for reviewing the project on GitHub because it shows the full workflow without requiring Gmail setup or real leads.
 
 ## Setup
 
@@ -77,6 +98,8 @@ py -m pip install requests beautifulsoup4
 The Gmail packages are only needed if you want to create Gmail drafts.
 
 ## Basic Workflow
+
+Use this workflow for private/local batches after you have reviewed the demo.
 
 Start by copying the example lead file:
 
@@ -104,6 +127,14 @@ Outreach Queue.md
 ```
 
 Review the outputs manually before using anything.
+
+You can also run the scripts against explicit input/output paths:
+
+```powershell
+py -B .\scripts\analyze_leads.py --input ".\examples\Leads Input.example.md" --output ".\examples\output\Scored Leads.md" --offline
+py -B .\scripts\generate_mini_audits.py --input ".\examples\output\Scored Leads.md" --audits-output ".\examples\output\Mini Audits.md" --drafts-output ".\examples\output\Draft Messages.md" --threshold 60
+py -B .\scripts\build_outreach_queue.py --scored ".\examples\output\Scored Leads.md" --drafts ".\examples\output\Draft Messages.md" --output ".\examples\output\Outreach Queue.md"
+```
 
 ## Lead Input Format
 
@@ -171,9 +202,6 @@ These constraints make the tool slower than a scraper, but they keep the workflo
 
 ## Next Improvements
 
-- Cleaner command-line options for input/output files.
-- Better examples using fully fake sample businesses.
-- A small test suite around Markdown parsing and scoring.
 - Safer CSV import/export.
 - More transparent scoring output.
 - A simple HTML report for a scored batch.

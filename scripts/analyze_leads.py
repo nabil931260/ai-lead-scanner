@@ -10,6 +10,7 @@ Safety boundaries:
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from dataclasses import dataclass
@@ -121,8 +122,8 @@ def parse_markdown_table(path: Path) -> list[dict[str, str]]:
     return rows
 
 
-def load_leads() -> list[Lead]:
-    rows = parse_markdown_table(LEADS_INPUT)
+def load_leads(path: Path = LEADS_INPUT) -> list[Lead]:
+    rows = parse_markdown_table(path)
     return [
         Lead(
             business=row.get("Business", ""),
@@ -223,6 +224,21 @@ def fetch_visible_text(url: str) -> tuple[str, str]:
     return text[:MAX_TEXT_CHARS], ""
 
 
+def offline_text_for_lead(lead: Lead) -> str:
+    return " ".join(
+        value
+        for value in (
+            lead.notes,
+            lead.online_presence_status,
+            lead.website_quality,
+            lead.offer_path,
+            lead.niche,
+            lead.source,
+        )
+        if value
+    )
+
+
 def find_signals(text: str) -> list[str]:
     lowered = text.lower()
     return [label for label, pattern in SIGNAL_PATTERNS.items() if re.search(pattern, lowered, flags=re.IGNORECASE)]
@@ -263,6 +279,16 @@ def score_website_lead(niche: str, text: str, signals: list[str]) -> tuple[int, 
     if len(text) < 500:
         score -= 10
     score = max(0, min(100, score))
+    confidence = "High" if score >= 80 else "Medium" if score >= 60 else "Low"
+    return score, confidence
+
+
+def score_offline_lead(niche: str, text: str, signals: list[str]) -> tuple[int, str]:
+    score, _ = score_website_lead(niche, text, signals)
+    if signals:
+        score = max(score, 65)
+    if any(word in text.lower() for word in ("quote", "estimate", "form", "follow-up", "booking")):
+        score = max(score, 70)
     confidence = "High" if score >= 80 else "Medium" if score >= 60 else "Low"
     return score, confidence
 
@@ -315,7 +341,7 @@ def manual_review_row(lead: Lead, reason: str) -> dict[str, object]:
     }
 
 
-def write_scored_rows(rows: list[dict[str, object]]) -> None:
+def write_scored_rows(rows: list[dict[str, object]], output_path: Path = SCORED_LEADS) -> None:
     header = [
         "Business",
         "Niche",
@@ -341,12 +367,13 @@ def write_scored_rows(rows: list[dict[str, object]]) -> None:
     ]
     for row in rows:
         lines.append("| " + " | ".join(escape_md(row.get(col, "")) for col in header) + " |")
-    SCORED_LEADS.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def analyze() -> int:
-    leads = load_leads()
-    print(f"Loaded {len(leads)} leads from {LEADS_INPUT}")
+def analyze(input_path: Path = LEADS_INPUT, output_path: Path = SCORED_LEADS, offline: bool = False) -> int:
+    leads = load_leads(input_path)
+    print(f"Loaded {len(leads)} leads from {input_path}")
     output: list[dict[str, object]] = []
     workflow_count = 0
     starter_count = 0
@@ -372,17 +399,20 @@ def analyze() -> int:
             manual_review_count += 1
             continue
 
-        robots_ok, reason = robots_allows(website)
-        if not robots_ok:
-            output.append(manual_review_row(lead, reason))
-            manual_review_count += 1
-            continue
+        if offline:
+            text = offline_text_for_lead(lead)
+        else:
+            robots_ok, reason = robots_allows(website)
+            if not robots_ok:
+                output.append(manual_review_row(lead, reason))
+                manual_review_count += 1
+                continue
 
-        text, error = fetch_visible_text(website)
-        if error:
-            output.append(manual_review_row(lead, error))
-            manual_review_count += 1
-            continue
+            text, error = fetch_visible_text(website)
+            if error:
+                output.append(manual_review_row(lead, error))
+                manual_review_count += 1
+                continue
 
         if is_weak_presence(lead):
             output.append(starter_row(lead))
@@ -390,18 +420,30 @@ def analyze() -> int:
             continue
 
         signals = find_signals(text)
-        score, confidence = score_website_lead(lead.niche, text, signals)
+        if offline:
+            score, confidence = score_offline_lead(lead.niche, text, signals)
+        else:
+            score, confidence = score_website_lead(lead.niche, text, signals)
         output.append(workflow_row(lead, signals, score, confidence))
         workflow_count += 1
 
-    write_scored_rows(output)
+    write_scored_rows(output, output_path)
     print(f"Workflow cleanup candidates: {workflow_count}")
     print(f"Starter site candidates: {starter_count}")
     print(f"Manual review leads: {manual_review_count}")
     print(f"Skipped blank rows: {skipped_count}")
-    print(f"Wrote {len(output)} scored rows to {SCORED_LEADS}")
+    print(f"Wrote {len(output)} scored rows to {output_path}")
     return 0
 
 
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Analyze manually supplied public business leads.")
+    parser.add_argument("--input", type=Path, default=LEADS_INPUT)
+    parser.add_argument("--output", type=Path, default=SCORED_LEADS)
+    parser.add_argument("--offline", action="store_true", help="Use notes/status fields instead of fetching websites.")
+    args = parser.parse_args()
+    return analyze(input_path=args.input, output_path=args.output, offline=args.offline)
+
+
 if __name__ == "__main__":
-    sys.exit(analyze())
+    sys.exit(main())

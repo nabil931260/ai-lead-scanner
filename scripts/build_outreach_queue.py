@@ -13,6 +13,7 @@ This script sends nothing, publishes nothing, and does not use Gmail.
 
 from __future__ import annotations
 
+import argparse
 import sys
 from collections import Counter
 from pathlib import Path
@@ -78,11 +79,11 @@ def score_value(row: dict[str, str]) -> int:
         return 0
 
 
-def generated_site_for_business(business: str, occurrence: int) -> str:
+def generated_site_for_business(business: str, occurrence: int, generated_sites_path: Path = GENERATED_SITES) -> str:
     base = slugify(business)
     candidates = [base] if occurrence == 1 else [f"{base}-{occurrence}", base]
     for candidate in candidates:
-        path = GENERATED_SITES / candidate / "index.html"
+        path = generated_sites_path / candidate / "index.html"
         if path.exists():
             return str(path.relative_to(ROOT)).replace("\\", "/")
     return ""
@@ -168,12 +169,17 @@ def recommended_action(row: dict[str, str], site_path: str, review_first: bool, 
     return "Review mini-audit and draft."
 
 
-def build_queue() -> list[dict[str, object]]:
-    scored = parse_markdown_table(SCORED_LEADS)
-    drafts = {row.get("Business", ""): row for row in parse_markdown_table(DRAFT_MESSAGES)}
+def build_queue(
+    scored_path: Path = SCORED_LEADS,
+    drafts_path: Path = DRAFT_MESSAGES,
+    queue_path: Path = OUTREACH_QUEUE,
+    generated_sites_path: Path = GENERATED_SITES,
+) -> list[dict[str, object]]:
+    scored = parse_markdown_table(scored_path)
+    drafts = {row.get("Business", ""): row for row in parse_markdown_table(drafts_path)}
     counts = Counter(row.get("Business", "") for row in scored)
 
-    existing_rows = parse_markdown_table(OUTREACH_QUEUE)
+    existing_rows = parse_markdown_table(queue_path)
     existing_lookup: dict[tuple[str, int], dict[str, str]] = {}
     if existing_rows:
         seen: Counter[str] = Counter()
@@ -190,7 +196,7 @@ def build_queue() -> list[dict[str, object]]:
         seen_scored[business] += 1
         occurrence = seen_scored[business]
         draft = drafts.get(business, {})
-        site_path = generated_site_for_business(business, occurrence)
+        site_path = generated_site_for_business(business, occurrence, generated_sites_path)
         draft_ok = draft_ready(draft)
         duplicate = counts[business] > 1
         review_first = False
@@ -252,7 +258,7 @@ def build_queue() -> list[dict[str, object]]:
     return rows
 
 
-def write_queue(rows: list[dict[str, object]]) -> None:
+def write_queue(rows: list[dict[str, object]], output_path: Path = OUTREACH_QUEUE) -> None:
     header = [
         "Priority",
         "Business",
@@ -287,14 +293,27 @@ def write_queue(rows: list[dict[str, object]]) -> None:
     ]
     for row in rows:
         lines.append("| " + " | ".join(escape_md(row.get(col, "")) for col in header) + " |")
-    OUTREACH_QUEUE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main() -> int:
-    rows = build_queue()
-    write_queue(rows)
+    parser = argparse.ArgumentParser(description="Build a manual-review outreach queue.")
+    parser.add_argument("--scored", type=Path, default=SCORED_LEADS)
+    parser.add_argument("--drafts", type=Path, default=DRAFT_MESSAGES)
+    parser.add_argument("--output", type=Path, default=OUTREACH_QUEUE)
+    parser.add_argument("--generated-sites", type=Path, default=GENERATED_SITES)
+    args = parser.parse_args()
+
+    rows = build_queue(
+        scored_path=args.scored,
+        drafts_path=args.drafts,
+        queue_path=args.output,
+        generated_sites_path=args.generated_sites,
+    )
+    write_queue(rows, args.output)
     high_count = sum(1 for row in rows if row["Priority"] == "High")
-    print(f"Wrote {len(rows)} businesses to {OUTREACH_QUEUE}")
+    print(f"Wrote {len(rows)} businesses to {args.output}")
     print(f"High priority: {high_count}")
     print("Top 5:")
     for row in rows[:5]:

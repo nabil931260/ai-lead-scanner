@@ -192,7 +192,7 @@ Draft generated. Needs manual review.
 """
 
 
-def write_mini_audits(rows: list[dict[str, str]]) -> None:
+def write_mini_audits(rows: list[dict[str, str]], output_path: Path = MINI_AUDITS) -> None:
     content = [
         "# Mini Audits",
         "",
@@ -207,10 +207,11 @@ def write_mini_audits(rows: list[dict[str, str]]) -> None:
         content.append("Note: no AI API key was used. These are rule-based drafts.\n")
     for row in rows:
         content.append(mini_audit_section(row))
-    MINI_AUDITS.write_text("\n".join(content).strip() + "\n", encoding="utf-8")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(content).strip() + "\n", encoding="utf-8")
 
 
-def write_draft_messages(rows: list[dict[str, str]]) -> None:
+def write_draft_messages(rows: list[dict[str, str]], output_path: Path = DRAFT_MESSAGES) -> None:
     header = [
         "Business",
         "Offer Type",
@@ -250,19 +251,36 @@ def write_draft_messages(rows: list[dict[str, str]]) -> None:
             "Notes": "Do not send until manually reviewed.",
         }
         lines.append("| " + " | ".join(escape_md(values.get(col, "")) for col in header) + " |")
-    DRAFT_MESSAGES.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def generate(
+    input_path: Path = SCORED_LEADS,
+    audits_output: Path = MINI_AUDITS,
+    drafts_output: Path = DRAFT_MESSAGES,
+    threshold: int = 70,
+) -> int:
+    rows = [row for row in parse_markdown_table(input_path) if score_value(row) >= threshold]
+    write_mini_audits(rows, audits_output)
+    write_draft_messages(rows, drafts_output)
+    print(f"Wrote {len(rows)} mini-audits and draft messages.")
+    return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--input", type=Path, default=SCORED_LEADS)
+    parser.add_argument("--audits-output", type=Path, default=MINI_AUDITS)
+    parser.add_argument("--drafts-output", type=Path, default=DRAFT_MESSAGES)
     parser.add_argument("--threshold", type=int, default=70)
     args = parser.parse_args()
-
-    rows = [row for row in parse_markdown_table(SCORED_LEADS) if score_value(row) >= args.threshold]
-    write_mini_audits(rows)
-    write_draft_messages(rows)
-    print(f"Wrote {len(rows)} mini-audits and draft messages.")
-    return 0
+    return generate(
+        input_path=args.input,
+        audits_output=args.audits_output,
+        drafts_output=args.drafts_output,
+        threshold=args.threshold,
+    )
 
 
 if __name__ == "__main__":

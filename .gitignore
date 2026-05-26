@@ -19,6 +19,8 @@ Outreach Queue.md
 Reply Log.md
 generated_sites/
 Archive/
+!examples/output/
+!examples/output/*.md
 
 # Obsidian/local notes that are useful privately but noisy publicly
 *.canvas
@@ -28,6 +30,7 @@ README_GITHUB_DRAFT.md
 GITHUB_PUSH_CHECKLIST.md
 Offer Strategy.md
 Public Market Research Plan.md
+docs/superpowers/
 
 # OS/editor
 .DS_Store

@@ -7,6 +7,23 @@ Main workflow docs:
 - `../Method 2 Website Analyzer Playbook.md`
 - `../Lead Search Field Guide.md`
 
+## Run The Public Demo
+
+The demo uses fake `.test` domains, stays offline, and writes only to `../examples/output/`.
+
+```powershell
+py -B .\run_demo.py
+```
+
+Generated files:
+
+```text
+../examples/output/Scored Leads.md
+../examples/output/Mini Audits.md
+../examples/output/Draft Messages.md
+../examples/output/Outreach Queue.md
+```
+
 ## Install Dependencies
 
 From this folder:
@@ -73,6 +90,14 @@ What it does:
 - Writes results back to Obsidian
 
 Use Path A for leads with a valid public business website.
+
+To run against explicit paths instead of the private root files:
+
+```powershell
+py -B .\analyze_leads.py --input "..\examples\Leads Input.example.md" --output "..\examples\output\Scored Leads.md" --offline
+py -B .\generate_mini_audits.py --input "..\examples\output\Scored Leads.md" --audits-output "..\examples\output\Mini Audits.md" --drafts-output "..\examples\output\Draft Messages.md" --threshold 60
+py -B .\build_outreach_queue.py --scored "..\examples\output\Scored Leads.md" --drafts "..\examples\output\Draft Messages.md" --output "..\examples\output\Outreach Queue.md"
+```
 
 ### Path B: Starter Site Offer
 
