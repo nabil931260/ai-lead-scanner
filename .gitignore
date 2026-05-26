@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local Gmail OAuth credentials/tokens
+scripts/credentials.json
+scripts/token.json
+scripts/token.*.json
+
+# Local working data
+Leads Input.md
+Scored Leads.md
+Mini Audits.md
+Draft Messages.md
+Outreach Queue.md
+Reply Log.md
+generated_sites/
+Archive/
+
+# Obsidian/local notes that are useful privately but noisy publicly
+*.canvas
+.obsidian/
+OBSIDIAN_FOLDER_INDEX.md
+README_GITHUB_DRAFT.md
+GITHUB_PUSH_CHECKLIST.md
+Offer Strategy.md
+Public Market Research Plan.md
+
+# OS/editor
+.DS_Store
+Thumbs.db
+desktop.ini
