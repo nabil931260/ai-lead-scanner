@@ -26,7 +26,7 @@ Avoid:
 
 ## Method 2 In One Line
 
-Manually find public business websites -> add them to [[Leads Input]] -> run analysis scripts -> review [[Scored Leads]], [[Mini Audits]], [[Draft Messages]], and [[Outreach Queue]] -> manually send only the best messages.
+Manually find public business websites -> optionally prepare rough rows with `prepare_leads.py` -> add them to [[Leads Input]] -> run analysis scripts -> review [[Scored Leads]], [[Mini Audits]], [[Draft Messages]], and [[Outreach Queue]] -> manually send only the best messages.
 
 ## Batch Size
 
@@ -121,7 +121,7 @@ D:\Obsidian\Central\03 Projects\Income Portfolio\AI Lead Scanner\scripts
 Run:
 
 ```powershell
-py -B .\analyze_leads.py
+py -B .\analyze_leads.py --max-pages 5
 py -B .\generate_mini_audits.py --threshold 60
 py -B .\build_outreach_queue.py
 ```
@@ -129,7 +129,7 @@ py -B .\build_outreach_queue.py
 If `py` is unavailable, use:
 
 ```powershell
-python .\analyze_leads.py
+python .\analyze_leads.py --max-pages 5
 python .\generate_mini_audits.py --threshold 60
 python .\build_outreach_queue.py
 ```
@@ -138,9 +138,10 @@ What each step does:
 
 | Script | Output | Purpose |
 |---|---|---|
-| `analyze_leads.py` | [[Scored Leads]] | fetches supplied public websites, checks signals, scores leads |
+| `prepare_leads.py` | [[Leads Input]] | converts rough pasted rows into the expected Markdown table |
+| `analyze_leads.py` | [[Scored Leads]] | fetches supplied public websites, checks likely same-domain pages, records evidence, scores leads |
 | `generate_mini_audits.py` | [[Mini Audits]], [[Draft Messages]] | creates rule-based audit notes and draft outreach |
-| `build_outreach_queue.py` | [[Outreach Queue]] | builds a manual review queue with draft/review gates |
+| `build_outreach_queue.py` | [[Outreach Queue]] | builds a manual review queue with draft/review gates and action categories |
 
 ## Review Gates Before Outreach
 
@@ -149,6 +150,8 @@ Do not contact a business until all are true:
 - Score is 60+ or there is a clear manual reason to override.
 - Mini-audit is specific, not generic.
 - Draft message references a real visible signal.
+- Evidence columns show the exact public signal and page checked.
+- Action category makes the next manual step obvious.
 - Contact email or contact form was found manually.
 - You can explain the offer in one sentence.
 - You are comfortable sending the message under your own name.

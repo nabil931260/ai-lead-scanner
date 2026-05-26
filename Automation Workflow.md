@@ -25,21 +25,32 @@ Current recommended path:
 1. Pick one niche and one city.
 2. Manually find 5-10 public business websites.
 3. Add only leads with a visible quote, booking, intake, or follow-up signal.
-4. Run the scanner scripts.
-5. Review top mini-audits and draft messages.
-6. Manually send 3-5 reviewed messages.
-7. Log replies and update the offer before expanding automation.
+4. Use `scripts/prepare_leads.py` if the leads are still in rough pasted-row format.
+5. Run the scanner scripts.
+6. Review evidence columns, top mini-audits, and draft messages.
+7. Use the outreach queue action category to decide the next manual step.
+8. Manually send 3-5 reviewed messages.
+9. Log replies and update the offer before expanding automation.
 
 ## Full Workflow
 
-1. Manually add leads to [[Leads Input]].
-2. Run `scripts/analyze_leads.py`.
-3. Write scored results to [[Scored Leads]].
-4. Generate mini-audits for top leads with `scripts/generate_mini_audits.py`.
-5. Write outreach drafts to [[Draft Messages]].
-6. Optional: create Gmail drafts only with `scripts/create_gmail_drafts.py`.
-7. Manually review and send.
-8. Log replies in [[Reply Log]] and [[03 Projects/Income Portfolio/Validation Tracker]].
+1. Manually collect public lead rows in `Raw Leads.txt` or directly in [[Leads Input]].
+2. Optional: run `scripts/prepare_leads.py` to convert rough rows into the required table.
+3. Run `scripts/analyze_leads.py --max-pages 5`.
+4. Review evidence, pages checked, contact signals, and missing signals in [[Scored Leads]].
+5. Generate mini-audits for top leads with `scripts/generate_mini_audits.py`.
+6. Write outreach drafts to [[Draft Messages]].
+7. Build [[Outreach Queue]] with action categories using `scripts/build_outreach_queue.py`.
+8. Optional: create Gmail drafts only with `scripts/create_gmail_drafts.py`.
+9. Manually review and send.
+10. Log replies in [[Reply Log]] and [[03 Projects/Income Portfolio/Validation Tracker]].
+
+## Automation Helpers
+
+- `prepare_leads.py`: formats manually collected rows into `Leads Input.md`.
+- `analyze_leads.py --max-pages 5`: checks the supplied URL plus likely same-domain contact/services/quote/FAQ pages.
+- `Scored Leads.md`: includes evidence, pages checked, contact signals, and missing signals.
+- `build_outreach_queue.py`: assigns action categories such as `Needs contact email`, `Needs stronger evidence`, `Needs mockup`, `Ready to review`, and `Reject / bad fit`.
 
 ## Two-Path Workflow
 

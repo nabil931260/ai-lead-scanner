@@ -16,7 +16,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
 import requests
@@ -30,6 +30,7 @@ SCORED_LEADS = ROOT / "Scored Leads.md"
 USER_AGENT = "ObsidianAILeadScanner/0.2 (+manual local research; no automated outreach)"
 TIMEOUT_SECONDS = 12
 MAX_TEXT_CHARS = 12000
+DEFAULT_MAX_PAGES = 5
 
 MISSING_WEBSITE_VALUES = {"", "n/a", "na", "none", "no website", "no site", "not found", "unknown"}
 WEAK_PRESENCE_VALUES = {"weak website", "social only", "no website found"}
@@ -53,6 +54,15 @@ SIGNAL_PATTERNS = {
     "Manual form language": r"\b(google form|fill out this form|form below|submit request)\b",
     "FAQ missing clue": r"\b(faq|frequently asked questions)\b",
 }
+
+PAGE_CANDIDATE_PATHS = (
+    "/contact",
+    "/services",
+    "/quote",
+    "/faq",
+    "/estimate",
+    "/contact-us",
+)
 
 NICHE_HINTS = {
     "Contractors / home services": ("quote", "estimate", "repair", "service area", "licensed", "insured"),
@@ -179,6 +189,26 @@ def is_valid_public_website(url: str) -> tuple[bool, str]:
     return True, ""
 
 
+def path_label(url: str) -> str:
+    parsed = urlparse(url)
+    return parsed.path.strip("/") or "home"
+
+
+def candidate_page_urls(url: str, max_pages: int = DEFAULT_MAX_PAGES) -> list[str]:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return [url]
+    urls = [url]
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    for path in PAGE_CANDIDATE_PATHS:
+        candidate = urljoin(base, path)
+        if candidate not in urls:
+            urls.append(candidate)
+        if len(urls) >= max_pages:
+            break
+    return urls[:max_pages]
+
+
 def robots_allows(url: str) -> tuple[bool, str]:
     parsed = urlparse(url)
     robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
@@ -244,6 +274,48 @@ def find_signals(text: str) -> list[str]:
     return [label for label, pattern in SIGNAL_PATTERNS.items() if re.search(pattern, lowered, flags=re.IGNORECASE)]
 
 
+def evidence_from_page(url: str, signals: list[str]) -> list[str]:
+    label = path_label(url)
+    return [f"{signal} on {label}" for signal in signals]
+
+
+def contact_signals_from(signals: Iterable[str]) -> list[str]:
+    contact_labels = ("Quote/estimate", "Booking", "Contact-only", "Manual form")
+    return [signal for signal in signals if any(signal.startswith(label) for label in contact_labels)]
+
+
+def missing_signals_from(signals: Iterable[str]) -> list[str]:
+    found = set(signals)
+    expected = {
+        "Quote/estimate language": "No quote/estimate language found",
+        "Booking/scheduling language": "No booking/scheduling language found",
+        "FAQ missing clue": "No FAQ language found",
+        "Follow-up or reminder language": "No follow-up/reminder language found",
+    }
+    return [missing for signal, missing in expected.items() if signal not in found]
+
+
+def analyze_pages(url: str, max_pages: int = DEFAULT_MAX_PAGES) -> tuple[str, list[str], list[str], list[str], list[str]]:
+    combined_text: list[str] = []
+    pages_checked: list[str] = []
+    evidence: list[str] = []
+    all_signals: list[str] = []
+    errors: list[str] = []
+    for page_url in candidate_page_urls(url, max_pages=max_pages):
+        text, error = fetch_visible_text(page_url)
+        if error:
+            errors.append(f"{path_label(page_url)}: {error}")
+            continue
+        pages_checked.append(page_url)
+        combined_text.append(text)
+        page_signals = find_signals(text)
+        all_signals.extend(signal for signal in page_signals if signal not in all_signals)
+        evidence.extend(evidence_from_page(page_url, page_signals))
+    if not combined_text and errors:
+        return "", [], errors[:3], [], []
+    return " ".join(combined_text), pages_checked, evidence, contact_signals_from(all_signals), missing_signals_from(all_signals)
+
+
 def is_home_service(niche: str) -> bool:
     lowered = niche.lower()
     return "contractor" in lowered or "contractos" in lowered or "home service" in lowered or "handyman" in lowered
@@ -294,11 +366,18 @@ def score_offline_lead(niche: str, text: str, signals: list[str]) -> tuple[int, 
 
 
 def workflow_row(lead: Lead, signals: list[str], score: int, confidence: str) -> dict[str, object]:
+    evidence = evidence_from_page(lead.website, signals)
+    contact_signals = contact_signals_from(signals)
+    missing_signals = missing_signals_from(signals)
     return {
         "Business": lead.business,
         "Niche": lead.niche,
         "Website": lead.website,
         "Visible signals": "; ".join(signals) if signals else "No strong public signals found",
+        "Evidence": "; ".join(evidence) if evidence else "No page-level evidence captured",
+        "Pages checked": path_label(lead.website),
+        "Contact signals": "; ".join(contact_signals) if contact_signals else "No strong contact signal found",
+        "Missing signals": "; ".join(missing_signals) if missing_signals else "No major missing signal flagged",
         "Likely pain": infer_pain(lead.niche, signals),
         "Offer Type": "Website + Workflow Improvement Audit",
         "Offer angle": "Website + quote/contact flow audit",
@@ -309,12 +388,34 @@ def workflow_row(lead: Lead, signals: list[str], score: int, confidence: str) ->
     }
 
 
+def workflow_row_with_evidence(
+    lead: Lead,
+    signals: list[str],
+    score: int,
+    confidence: str,
+    evidence: list[str],
+    pages_checked: list[str],
+    contact_signals: list[str],
+    missing_signals: list[str],
+) -> dict[str, object]:
+    row = workflow_row(lead, signals, score, confidence)
+    row["Evidence"] = "; ".join(evidence) if evidence else "No page-level evidence captured"
+    row["Pages checked"] = "; ".join(path_label(page) for page in pages_checked) if pages_checked else path_label(lead.website)
+    row["Contact signals"] = "; ".join(contact_signals) if contact_signals else "No strong contact signal found"
+    row["Missing signals"] = "; ".join(missing_signals) if missing_signals else "No major missing signal flagged"
+    return row
+
+
 def starter_row(lead: Lead) -> dict[str, object]:
     return {
         "Business": lead.business,
         "Niche": lead.niche,
         "Website": lead.website or "N/A",
         "Visible signals": "No website provided / missing online presence",
+        "Evidence": "No public website supplied",
+        "Pages checked": "N/A",
+        "Contact signals": "No website contact path found",
+        "Missing signals": "Website missing or weak",
         "Likely pain": "Missing or weak web presence may limit quote requests, lead capture, and follow-up.",
         "Offer Type": "Starter Site + Lead Tracker",
         "Offer angle": "Starter landing page + quote/contact form + lead tracker",
@@ -331,6 +432,10 @@ def manual_review_row(lead: Lead, reason: str) -> dict[str, object]:
         "Niche": lead.niche,
         "Website": lead.website,
         "Visible signals": reason,
+        "Evidence": reason,
+        "Pages checked": "Manual review needed",
+        "Contact signals": "Manual review needed",
+        "Missing signals": "Analysis could not complete",
         "Likely pain": "Manual review needed before analysis.",
         "Offer Type": "Manual Review Needed",
         "Offer angle": "Manual review needed",
@@ -347,6 +452,10 @@ def write_scored_rows(rows: list[dict[str, object]], output_path: Path = SCORED_
         "Niche",
         "Website",
         "Visible signals",
+        "Evidence",
+        "Pages checked",
+        "Contact signals",
+        "Missing signals",
         "Likely pain",
         "Offer Type",
         "Offer angle",
@@ -371,7 +480,12 @@ def write_scored_rows(rows: list[dict[str, object]], output_path: Path = SCORED_
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def analyze(input_path: Path = LEADS_INPUT, output_path: Path = SCORED_LEADS, offline: bool = False) -> int:
+def analyze(
+    input_path: Path = LEADS_INPUT,
+    output_path: Path = SCORED_LEADS,
+    offline: bool = False,
+    max_pages: int = DEFAULT_MAX_PAGES,
+) -> int:
     leads = load_leads(input_path)
     print(f"Loaded {len(leads)} leads from {input_path}")
     output: list[dict[str, object]] = []
@@ -401,16 +515,15 @@ def analyze(input_path: Path = LEADS_INPUT, output_path: Path = SCORED_LEADS, of
 
         if offline:
             text = offline_text_for_lead(lead)
+            pages_checked = [website]
+            page_evidence: list[str] = []
+            contact_signals: list[str] = []
+            missing_signals: list[str] = []
         else:
-            robots_ok, reason = robots_allows(website)
-            if not robots_ok:
+            text, pages_checked, page_evidence, contact_signals, missing_signals = analyze_pages(website, max_pages=max_pages)
+            if not text:
+                reason = "; ".join(page_evidence) if page_evidence else "No pages could be analyzed"
                 output.append(manual_review_row(lead, reason))
-                manual_review_count += 1
-                continue
-
-            text, error = fetch_visible_text(website)
-            if error:
-                output.append(manual_review_row(lead, error))
                 manual_review_count += 1
                 continue
 
@@ -422,9 +535,23 @@ def analyze(input_path: Path = LEADS_INPUT, output_path: Path = SCORED_LEADS, of
         signals = find_signals(text)
         if offline:
             score, confidence = score_offline_lead(lead.niche, text, signals)
+            page_evidence = evidence_from_page(website, signals)
+            contact_signals = contact_signals_from(signals)
+            missing_signals = missing_signals_from(signals)
         else:
             score, confidence = score_website_lead(lead.niche, text, signals)
-        output.append(workflow_row(lead, signals, score, confidence))
+        output.append(
+            workflow_row_with_evidence(
+                lead,
+                signals,
+                score,
+                confidence,
+                page_evidence,
+                pages_checked,
+                contact_signals,
+                missing_signals,
+            )
+        )
         workflow_count += 1
 
     write_scored_rows(output, output_path)
@@ -441,8 +568,9 @@ def main() -> int:
     parser.add_argument("--input", type=Path, default=LEADS_INPUT)
     parser.add_argument("--output", type=Path, default=SCORED_LEADS)
     parser.add_argument("--offline", action="store_true", help="Use notes/status fields instead of fetching websites.")
+    parser.add_argument("--max-pages", type=int, default=DEFAULT_MAX_PAGES, help="Maximum same-domain pages to inspect per website.")
     args = parser.parse_args()
-    return analyze(input_path=args.input, output_path=args.output, offline=args.offline)
+    return analyze(input_path=args.input, output_path=args.output, offline=args.offline, max_pages=args.max_pages)
 
 
 if __name__ == "__main__":

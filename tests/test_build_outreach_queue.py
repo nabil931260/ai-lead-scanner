@@ -36,3 +36,4 @@ class BuildOutreachQueueTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertIn("Example Painting Co", content)
         self.assertIn("Missing contact email", content)
+        self.assertIn("Needs contact email", content)

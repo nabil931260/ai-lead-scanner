@@ -31,8 +31,11 @@ Find public-facing businesses or niches with visible workflow problems and creat
 ## What It Is
 
 - Manual lead scorecard
+- Lead input formatter for rough manually collected rows
 - Mini-audit workflow
 - Opportunity signal checklist
+- Evidence-based scoring output
+- Manual next-action queue categories
 - Prompt library for evaluating public/manual lead information
 - Test lead table
 - Bridge from lead research to outreach
@@ -72,6 +75,7 @@ Find public-facing businesses or niches with visible workflow problems and creat
 
 - Scored lead list
 - Visible workflow pain signals
+- Evidence, pages checked, contact signals, and missing signals
 - Mini-audit notes
 - Offer angle
 - Recommended message version

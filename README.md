@@ -9,17 +9,20 @@ This project is intentionally conservative. It does not scrape private platforms
 ## What It Does
 
 - Reads a manually created Markdown table of leads.
+- Converts simple pasted lead rows into the required Markdown lead table.
 - Checks whether each website is a valid public business site.
 - Skips social platforms and login-gated URLs.
 - Checks `robots.txt` before fetching a page.
-- Pulls visible page text from supplied URLs.
+- Pulls visible page text from supplied URLs and a small set of likely same-domain pages.
 - Looks for workflow signals like quote requests, contact-only intake, booking language, service menus, and follow-up wording.
+- Records evidence, pages checked, contact signals, and missing signals so scores can be reviewed.
 - Scores each lead and classifies it as:
   - website/workflow cleanup candidate
   - starter-site candidate
   - manual review needed
 - Generates short rule-based mini-audits.
 - Builds a manual outreach queue.
+- Adds next-action categories like `Needs contact email`, `Needs mockup`, and `Ready to review`.
 - Optionally creates Gmail drafts after explicit approval flags are set.
 
 ## What It Does Not Do
@@ -43,12 +46,15 @@ It is not meant to prove demand by itself. A scored lead is just a lead. Real va
 ```text
 .
 |-- scripts/
+|   |-- prepare_leads.py
 |   |-- analyze_leads.py
 |   |-- generate_mini_audits.py
 |   |-- build_outreach_queue.py
 |   |-- create_gmail_drafts.py
-|   `-- generate_starter_sites.py
+|   |-- generate_starter_sites.py
+|   `-- run_demo.py
 |-- examples/
+|   |-- Raw Leads.example.txt
 |   |-- Leads Input.example.md
 |   |-- output/
 |   |   |-- Scored Leads.md
@@ -109,10 +115,17 @@ Copy-Item ".\examples\Leads Input.example.md" ".\Leads Input.md"
 
 Edit `Leads Input.md` manually. Add only public business websites that you intentionally reviewed.
 
+If you have a rough pasted list first, you can format it into the expected table:
+
+```powershell
+Copy-Item ".\examples\Raw Leads.example.txt" ".\Raw Leads.txt"
+py -B .\scripts\prepare_leads.py --input ".\Raw Leads.txt" --output ".\Leads Input.md"
+```
+
 Then run:
 
 ```powershell
-py -B .\scripts\analyze_leads.py
+py -B .\scripts\analyze_leads.py --max-pages 5
 py -B .\scripts\generate_mini_audits.py --threshold 60
 py -B .\scripts\build_outreach_queue.py
 ```
@@ -127,6 +140,8 @@ Outreach Queue.md
 ```
 
 Review the outputs manually before using anything.
+
+`Scored Leads.md` includes evidence columns so you can see why a lead scored the way it did. `Outreach Queue.md` includes an action category so the next manual step is easier to choose.
 
 You can also run the scripts against explicit input/output paths:
 
@@ -196,6 +211,7 @@ These constraints make the tool slower than a scraper, but they keep the workflo
 
 - The site analysis is rule-based, not an LLM.
 - It only fetches the supplied page, not an entire website crawl.
+- Multi-page analysis is intentionally shallow and capped by `--max-pages`.
 - Some useful sites are skipped because of `robots.txt` or `403` responses.
 - Scoring is a heuristic and needs human judgment.
 - Gmail draft creation requires local OAuth setup.
@@ -203,7 +219,6 @@ These constraints make the tool slower than a scraper, but they keep the workflo
 ## Next Improvements
 
 - Safer CSV import/export.
-- More transparent scoring output.
 - A simple HTML report for a scored batch.
 
 ## Status

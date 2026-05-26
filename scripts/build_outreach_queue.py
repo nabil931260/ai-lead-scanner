@@ -169,6 +169,26 @@ def recommended_action(row: dict[str, str], site_path: str, review_first: bool, 
     return "Review mini-audit and draft."
 
 
+def action_category(row: dict[str, str], site_path: str, draft_ok: bool, contact_path: str) -> str:
+    status = row.get("Status", "").strip().lower()
+    score = score_value(row)
+    evidence = row.get("Evidence", "").strip().lower()
+    missing = row.get("Missing signals", "").strip().lower()
+    if status == "manual review needed" or score <= 0:
+        return "Reject / bad fit"
+    if not has_contact_path(contact_path):
+        return "Needs contact email"
+    if status == "starter site candidate" and not site_path:
+        return "Needs mockup"
+    if not draft_ok:
+        return "Needs stronger evidence"
+    if score < 60 or "no page-level evidence" in evidence:
+        return "Needs stronger evidence"
+    if "analysis could not complete" in missing:
+        return "Reject / bad fit"
+    return "Ready to review"
+
+
 def build_queue(
     scored_path: Path = SCORED_LEADS,
     drafts_path: Path = DRAFT_MESSAGES,
@@ -237,6 +257,7 @@ def build_queue(
         rows.append(
             {
                 "Priority": priority(row, site_path, draft_ok, review_first),
+                "Action Category": action_category(row, site_path, draft_ok, contact_path),
                 "Business": business,
                 "Niche": row.get("Niche", ""),
                 "Score": score_value(row),
@@ -261,6 +282,7 @@ def build_queue(
 def write_queue(rows: list[dict[str, object]], output_path: Path = OUTREACH_QUEUE) -> None:
     header = [
         "Priority",
+        "Action Category",
         "Business",
         "Niche",
         "Score",

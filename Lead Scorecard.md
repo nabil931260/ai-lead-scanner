@@ -17,6 +17,8 @@ Score each lead out of 100.
 | Evidence quality | 10 | Is the pain based on a real visible signal, public clue, or direct context rather than a guess? |
 | Next best action clarity | 10 | Is it obvious what question/message to send next? |
 
+The scanner writes evidence columns into `Scored Leads.md`. Use those columns to confirm the score before moving a lead into outreach.
+
 ## Score Interpretation
 
 - **80-100:** message first

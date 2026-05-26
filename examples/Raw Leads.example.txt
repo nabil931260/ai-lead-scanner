@@ -1,0 +1,4 @@
+# business | niche | location | website | notes
+Example Painting Co | Painting services | Plano, TX | https://example-painting.test/contact | Quote form asks for project details, so follow-up may be tracked manually.
+Example Remodelers | Remodeling services | Richardson, TX | https://example-remodelers.test/estimate | Estimate page has phone and form paths, so lead handoff may need a tracker.
+Example Mobile Detailer | Mobile detailing | Dallas, TX | N/A | No website found; quote requests appear to come through phone/text.

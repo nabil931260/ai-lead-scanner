@@ -11,6 +11,7 @@ scripts/token.json
 scripts/token.*.json
 
 # Local working data
+Raw Leads.txt
 Leads Input.md
 Scored Leads.md
 Mini Audits.md

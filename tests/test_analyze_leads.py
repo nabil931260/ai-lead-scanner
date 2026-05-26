@@ -37,3 +37,11 @@ class AnalyzeLeadsTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("Workflow Cleanup Candidate", content)
         self.assertIn("Starter Site Candidate", content)
+        self.assertIn("Evidence", content)
+        self.assertIn("Pages checked", content)
+
+    def test_candidate_page_urls_stay_on_same_domain_and_limit_pages(self):
+        urls = analyze_leads.candidate_page_urls("https://example-painting.test/start", max_pages=4)
+        self.assertEqual(urls[0], "https://example-painting.test/start")
+        self.assertEqual(len(urls), 4)
+        self.assertIn("https://example-painting.test/contact", urls)

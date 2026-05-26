@@ -42,6 +42,18 @@ Add real public business websites to:
 ../Leads Input.md
 ```
 
+For rough pasted rows, prepare the Markdown table first:
+
+```powershell
+py -B .\prepare_leads.py --input "..\Raw Leads.txt" --output "..\Leads Input.md"
+```
+
+Accepted raw row shape:
+
+```text
+Business | Niche | Location | Website | Notes
+```
+
 Use only:
 
 - Public business websites
@@ -64,7 +76,7 @@ Do not use:
 ### Path A: Website Analyzer
 
 ```powershell
-py -B .\analyze_leads.py
+py -B .\analyze_leads.py --max-pages 5
 py -B .\generate_mini_audits.py --threshold 60
 py -B .\build_outreach_queue.py
 ```
@@ -85,8 +97,10 @@ What it does:
 - Checks robots.txt
 - Fetches only the supplied public page
 - Extracts visible text
+- Checks a small set of likely same-domain pages such as contact, services, quote, estimate, and FAQ
 - Looks for workflow pain signals
 - Scores leads
+- Writes evidence, pages checked, contact signals, and missing signals
 - Writes results back to Obsidian
 
 Use Path A for leads with a valid public business website.
